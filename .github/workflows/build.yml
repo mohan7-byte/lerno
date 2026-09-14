@@ -1,0 +1,455 @@
+name: Build Lerno APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Scaffold Native Android App
+        run: |
+          mkdir -p app/src/main/java/com/lerno/live
+          mkdir -p app/src/main/assets
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-mdpi
+
+          cp index.html app/src/main/assets/index.html
+
+          # Fallback icon
+          echo "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAATUlEQVR42u3PMQEAAAgEIPuX1hgc/LDBV9JJ6rWTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwBv0hQABH1mYugAAAABJRU5ErkJggg==" | base64 -d > app/src/main/res/mipmap-hdpi/ic_launcher.png
+          cp app/src/main/res/mipmap-hdpi/ic_launcher.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+          cp app/src/main/res/mipmap-hdpi/ic_launcher.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          cp app/src/main/res/mipmap-hdpi/ic_launcher.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          cp app/src/main/res/mipmap-hdpi/ic_launcher.png app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+          if [ -f icon.png ]; then
+            cp icon.png app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+            cp icon.png app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+            cp icon.png app/src/main/res/mipmap-xhdpi/ic_launcher.png
+            cp icon.png app/src/main/res/mipmap-hdpi/ic_launcher.png
+            cp icon.png app/src/main/res/mipmap-mdpi/ic_launcher.png
+          fi
+
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">Lerno</string>
+              <string name="accessibility_desc">Enables Volume UP double-click trigger for instant English practice and real-time translation.</string>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/xml/accessibility_service_config.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+              android:accessibilityEventTypes="typeWindowStateChanged"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:accessibilityFlags="flagDefault|flagRequestFilterKeyEvents"
+              android:canRequestFilterKeyEvents="true"
+              android:description="@string/accessibility_desc"
+              android:notificationTimeout="50" />
+          EOF
+
+          cat << 'EOF' > gradle.properties
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          org.gradle.jvmargs=-Xmx2048m
+          EOF
+
+          cat << 'EOF' > build.gradle
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.2.2'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          EOF
+
+          cat << 'EOF' > settings.gradle
+          rootProject.name = "Lerno"
+          include ':app'
+          EOF
+
+          cat << 'EOF' > app/build.gradle
+          apply plugin: 'com.android.application'
+
+          android {
+              namespace 'com.lerno.live'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "com.lerno.live"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+              }
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+              <application
+                  android:label="Lerno"
+                  android:icon="@mipmap/ic_launcher"
+                  android:hardwareAccelerated="true"
+                  android:usesCleartextTraffic="true"
+                  android:theme="@android:style/Theme.Translucent.NoTitleBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:showWhenLocked="true"
+                      android:turnScreenOn="true"
+                      android:launchMode="singleInstance"
+                      android:excludeFromRecents="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                      <intent-filter>
+                          <action android:name="android.intent.action.ASSIST" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                      </intent-filter>
+                  </activity>
+
+                  <service
+                      android:name=".VolumeTriggerService"
+                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.accessibilityservice.AccessibilityService" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.accessibilityservice"
+                          android:resource="@xml/accessibility_service_config" />
+                  </service>
+              </application>
+          </manifest>
+          EOF
+
+          # VolumeTriggerService.java: Double-Click Volume UP Wake Engine
+          cat << 'EOF' > app/src/main/java/com/lerno/live/VolumeTriggerService.java
+          package com.lerno.live;
+
+          import android.accessibilityservice.AccessibilityService;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.os.Build;
+          import android.os.SystemClock;
+          import android.os.VibrationEffect;
+          import android.os.Vibrator;
+          import android.view.KeyEvent;
+          import android.view.accessibility.AccessibilityEvent;
+
+          public class VolumeTriggerService extends AccessibilityService {
+              public static VolumeTriggerService instance = null;
+              private long lastVolumeUpTime = 0;
+              private static final long DOUBLE_PRESS_INTERVAL = 450;
+
+              @Override
+              public void onServiceConnected() {
+                  super.onServiceConnected();
+                  instance = this;
+              }
+
+              @Override
+              public void onDestroy() {
+                  instance = null;
+                  super.onDestroy();
+              }
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {}
+
+              @Override
+              public void onInterrupt() {}
+
+              @Override
+              protected boolean onKeyEvent(KeyEvent event) {
+                  int keyCode = event.getKeyCode();
+                  int action = event.getAction();
+
+                  // Volume UP Trigger: Double-press within 450ms
+                  if (keyCode == KeyEvent.KEYCODE_VOLUME_UP && action == KeyEvent.ACTION_DOWN) {
+                      long now = SystemClock.uptimeMillis();
+                      if (now - lastVolumeUpTime < DOUBLE_PRESS_INTERVAL) {
+                          lastVolumeUpTime = 0;
+                          launchLernoWithHaptics();
+                          return true;
+                      } else {
+                          lastVolumeUpTime = now;
+                      }
+                  }
+                  return super.onKeyEvent(event);
+              }
+
+              private void launchLernoWithHaptics() {
+                  try {
+                      Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                      if (v != null) {
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                              v.vibrate(VibrationEffect.createWaveform(new long[]{0, 50, 70, 50}, -1));
+                          } else {
+                              v.vibrate(new long[]{0, 50, 70, 50}, -1);
+                          }
+                      }
+                  } catch (Exception ignored) {}
+
+                  Intent intent = new Intent(this, MainActivity.class);
+                  intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK 
+                                | Intent.FLAG_ACTIVITY_SINGLE_TOP 
+                                | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+                  startActivity(intent);
+              }
+          }
+          EOF
+
+          # MainActivity.java: Dynamic 72dp Dock / Full-Screen Studio & Lifecycle Bridge
+          cat << 'EOF' > app/src/main/java/com/lerno/live/MainActivity.java
+          package com.lerno.live;
+
+          import android.Manifest;
+          import android.app.Activity;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.graphics.drawable.ColorDrawable;
+          import android.media.AudioManager;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.util.DisplayMetrics;
+          import android.view.Gravity;
+          import android.view.KeyEvent;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.PermissionRequest;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.widget.Toast;
+
+          public class MainActivity extends Activity {
+              public static MainActivity instance = null;
+              private WebView webView;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  instance = this;
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                      setShowWhenLocked(true);
+                      setTurnScreenOn(true);
+                  } else {
+                      getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                              | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+                  }
+
+                  getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+
+                  // Start by default as a clean 72dp bottom floating bar
+                  shrinkWindow();
+
+                  if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 101);
+                  }
+
+                  webView = new WebView(this);
+                  webView.setBackgroundColor(Color.TRANSPARENT);
+                  webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                  setContentView(webView);
+
+                  WebSettings s = webView.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setDatabaseEnabled(true);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  s.setAllowFileAccess(true);
+                  s.setAllowContentAccess(true);
+
+                  webView.addJavascriptInterface(new Object() {
+                      @JavascriptInterface
+                      public void minimize() { runOnUiThread(() -> moveTaskToBack(true)); }
+
+                      @JavascriptInterface
+                      public void closeApp() { runOnUiThread(() -> finish()); }
+
+                      @JavascriptInterface
+                      public void expandWindow() { MainActivity.this.expandWindow(); }
+
+                      @JavascriptInterface
+                      public void shrinkWindow() { MainActivity.this.shrinkWindow(); }
+
+                      @JavascriptInterface
+                      public void openAccessibilitySettings() {
+                          runOnUiThread(() -> {
+                              Intent intent = new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS);
+                              intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              startActivity(intent);
+                          });
+                      }
+
+                      @JavascriptInterface
+                      public void showToast(String msg) {
+                          runOnUiThread(() -> Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show());
+                      }
+                  }, "AndroidBridge");
+
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest request) {
+                          runOnUiThread(() -> request.grant(request.getResources()));
+                      }
+                  });
+
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              public void shrinkWindow() {
+                  runOnUiThread(() -> {
+                      try {
+                          DisplayMetrics dm = getResources().getDisplayMetrics();
+                          int heightPx = Math.round(72 * dm.density);
+                          Window window = getWindow();
+                          window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, heightPx);
+                          WindowManager.LayoutParams params = window.getAttributes();
+                          params.gravity = Gravity.BOTTOM;
+                          window.setAttributes(params);
+                      } catch (Exception ignored) {}
+                  });
+              }
+
+              public void expandWindow() {
+                  runOnUiThread(() -> {
+                      try {
+                          Window window = getWindow();
+                          window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+                          WindowManager.LayoutParams params = window.getAttributes();
+                          params.gravity = Gravity.FILL;
+                          window.setAttributes(params);
+                      } catch (Exception ignored) {}
+                  });
+              }
+
+              @Override
+              protected void onPause() {
+                  super.onPause();
+                  if (webView != null) webView.resumeTimers();
+              }
+
+              @Override
+              protected void onStop() {
+                  super.onStop();
+                  if (webView != null) webView.resumeTimers();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  instance = null;
+                  if (isFinishing() && webView != null) {
+                      webView.loadUrl("about:blank");
+                      webView.stopLoading();
+                      webView.destroy();
+                      webView = null;
+                  }
+                  super.onDestroy();
+              }
+
+              @Override
+              protected void onNewIntent(Intent intent) {
+                  super.onNewIntent(intent);
+                  setIntent(intent);
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                      setShowWhenLocked(true);
+                      setTurnScreenOn(true);
+                  }
+
+                  if (webView != null) {
+                      webView.resumeTimers();
+                      webView.evaluateJavascript("if (typeof autoConnectOnWake === 'function') autoConnectOnWake();", null);
+                  }
+              }
+
+              @Override
+              public boolean onKeyDown(int keyCode, KeyEvent event) {
+                  if (keyCode == KeyEvent.KEYCODE_BACK) {
+                      // If Studio is open, HTML shrinks it; otherwise minimizes
+                      webView.evaluateJavascript("handleBackButton();", null);
+                      return true;
+                  }
+                  return super.onKeyDown(keyCode, event);
+              }
+          }
+          EOF
+
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.5
+
+      - name: Compile Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK as Direct Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lerno-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Create Release & Upload APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete v1.0 --yes || true
+          git tag -d v1.0 || true
+          gh release create v1.0 app/build/outputs/apk/debug/app-debug.apk \
+            --title "Lerno v1.0" \
+            --notes "Lerno v1.0: Autonomous Spoken English Tutor & Hindi Translator with Volume UP Wake, Lock Screen Bypass & Nightshade Architecture." || true
