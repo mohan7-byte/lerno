@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Lerno — Fluent Spoken English</title>
+<style>
+:root{
+  --case:#141517; --case2:#1c1d20; --case3:#24262a; --line:#2c2e33; --line-soft:#212327;
+  --ink:#f3f4f6; --dim:#9ca3af; --faint:#6b7280;
+  --sage:#93a888; --dust:#8ba3b8; --clay:#c08a6e; --amber:#fbbf24; --purple:#c084fc; --stone:#6f7175;
+  --sans: -apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
+  --mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent !important;color:var(--ink);font-family:var(--sans)}
+
+/* ===== FLOATING DOCK BAR (Compact 70dp at bottom) ===== */
+.dock{
+  position:fixed;left:0;right:0;bottom:0;
+  display:flex;justify-content:center;align-items:flex-end;
+  padding:0 8px calc(6px + env(safe-area-inset-bottom, 6px));
+  z-index:10;pointer-events:none;
+}
+.bar{
+  pointer-events:auto;width:100%;max-width:680px;
+  display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:var(--case2);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 12px 32px rgba(0,0,0,.7);
+}
+
+.swatch{width:34px;height:34px;flex:none;border-radius:6px;background:var(--stone);position:relative;transition:background .35s ease}
+.swatch.state-listening{background:var(--sage)}
+.swatch.state-working{background:var(--dust);animation:swatchPulse 1.2s infinite alternate}
+.swatch.state-speaking{background:var(--clay)}
+.swatch::after{content:"";position:absolute;inset:0;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+
+@keyframes swatchPulse {
+  0%{transform:scale(0.95);opacity:.8}
+  100%{transform:scale(1.05);opacity:1}
+}
+
+.copy{flex:1;min-width:0;cursor:pointer}
+.title-row{display:flex;align-items:center;gap:6px}
+.title{font-size:13px;font-weight:700;letter-spacing:-.01em}
+.mode-tag{font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--sage)}
+.sub{font-size:10.5px;color:var(--dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.actions{display:flex;align-items:center;gap:5px;flex:none}
+
+/* Flip On/Off Switch */
+.flip{
+  position:relative;width:62px;height:32px;flex:none;border-radius:6px;
+  background:#0f1011;border:1px solid var(--line);cursor:pointer;overflow:hidden;
+}
+.flip .half{position:absolute;top:0;bottom:0;width:50%;display:grid;place-items:center;font-size:10px;font-weight:600;color:var(--dim);z-index:1}
+.flip .half.a{left:0}.flip .half.b{right:0}
+.flip .slab{position:absolute;top:2px;bottom:2px;left:2px;width:calc(50% - 4px);border-radius:4px;background:var(--case);border:1px solid var(--line);transition:transform .22s cubic-bezier(.4,0,.2,1), background .22s}
+.flip.on .slab{transform:translateX(100%);background:var(--sage);border-color:var(--sage)}
+.flip.on .half.b{color:#131a10}
+
+/* Utility buttons */
+.btn-icon{
+  width:32px;height:32px;flex:none;border-radius:6px;background:#0f1011;border:1px solid var(--line);
+  display:grid;place-items:center;cursor:pointer;color:var(--dim);transition:all .2s;
+}
+.btn-icon svg{width:14px;height:14px}
+.btn-icon:active{background:#0a0a0b}
+.btn-icon.active{background:rgba(251,191,36,.2);color:var(--amber);border-color:var(--amber)}
+
+/* ===== FULL-SCREEN LEARNING STUDIO ===== */
+.studio{
+  position:fixed;inset:0;background:var(--case);z-index:30;
+  display:flex;flex-direction:column;
+  transform:translateY(102%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  overflow:hidden;
+}
+.studio.open{transform:translateY(0)}
+
+.studio-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--line);background:var(--case2);
+}
+.app-brand{font-size:16px;font-weight:800;letter-spacing:-.02em;color:#fff}
+.studio-actions{display:flex;align-items:center;gap:8px}
+
+/* Mode Switcher Tabs */
+.mode-segmented{
+  display:flex;background:#0d0e10;border:1px solid var(--line);border-radius:8px;padding:3px;margin:12px 16px 0;
+}
+.mode-opt{
+  flex:1;text-align:center;padding:7px 0;font-size:11.5px;font-weight:600;color:var(--dim);
+  border-radius:6px;cursor:pointer;transition:all .2s;
+}
+.mode-opt.active{background:var(--case3);color:#fff;border:1px solid var(--line)}
+
+/* Studio Body Navigation */
+.studio-nav{
+  display:flex;border-bottom:1px solid var(--line);padding:0 16px;background:var(--case);
+}
+.nav-tab{
+  padding:10px 14px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;
+}
+.nav-tab.active{color:var(--ink);border-bottom-color:var(--sage)}
+
+/* Tab Panes */
+.tab-content{flex:1;overflow-y:auto;padding:16px;min-width:0}
+.pane{display:none}.pane.active{display:block}
+
+/* Live Practice Card */
+.card-live{
+  background:var(--case2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;
+}
+.card-label{font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.text-hindi{font-size:14px;line-height:1.5;color:var(--dim);margin-bottom:12px}
+.text-english{font-size:16px;font-weight:600;line-height:1.45;color:#fff}
+
+.card-actions{display:flex;gap:8px;margin-top:14px;align-items:center}
+.btn-star{
+  display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:6px;
+  background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);color:var(--amber);
+  font-size:11.5px;font-weight:600;cursor:pointer;
+}
+.btn-star.saved{background:var(--amber);color:#101112;border-color:var(--amber)}
+
+/* Bookmark Vault List */
+.bookmark-item{
+  background:var(--case2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+}
+.bm-hi{font-size:11.5px;color:var(--dim)}
+.bm-en{font-size:13.5px;font-weight:600;color:#fff;margin-top:3px}
+.bm-del{background:transparent;border:none;color:var(--faint);cursor:pointer;padding:4px}
+.bm-del:hover{color:var(--clay)}
+
+/* Form inputs & controls */
+.field{margin-bottom:12px}
+.field-lbl{font-size:10.5px;color:var(--faint);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=password],select,textarea{
+  width:100%;background:#0c0d0f;border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+  font-size:12px;color:#fff;outline:none;user-select:text;
+}
+input[type=password],input[type=text]{font-family:var(--mono)}
+textarea{font-family:var(--mono);font-size:11.5px;line-height:1.45;min-height:90px;resize:vertical}
+
+.item-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
+.ir-title{font-size:12.5px;font-weight:600}
+.ir-desc{font-size:10.5px;color:var(--dim);margin-top:2px}
+
+.toggle{position:relative;width:38px;height:20px;flex:none;cursor:pointer}
+.toggle input{display:none}
+.ttrack{position:absolute;inset:0;border-radius:4px;background:#0d0e0f;border:1px solid var(--line)}
+.tthumb{position:absolute;width:12px;height:12px;left:3px;top:3px;border-radius:2px;background:var(--faint);transition:transform .2s,background .2s}
+input:checked + .ttrack{border-color:var(--sage)}
+input:checked + .ttrack + .tthumb{transform:translateX(18px);background:var(--sage)}
+
+.hidden{display:none !important}
+</style>
+</head>
+<body class="state-idle">
+
+  <!-- Floating Dock Bar -->
+  <div class="dock">
+    <div class="bar" id="dockBar">
+      <div class="swatch" id="swatch"></div>
+      
+      <div class="copy" id="dockCopy">
+        <div class="title-row">
+          <div class="title">Lerno</div>
+          <div class="mode-tag" id="dockModeTag">Translate</div>
+        </div>
+        <div class="sub" id="subText">Idle</div>
+      </div>
+
+      <div class="actions">
+        <!-- Quick Bookmark Star on Floating Bar -->
+        <button class="btn-icon" id="quickStarBtn" title="Bookmark Last Sentence">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+
+        <!-- On / Off Toggle Slab -->
+        <div class="flip" id="flipBtn">
+          <div class="half a">Off</div>
+          <div class="half b">On</div>
+          <div class="slab"></div>
+        </div>
+
+        <!-- Expand Studio Button -->
+        <button class="btn-icon" id="expandStudioBtn" title="Open Learning Studio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full-Screen Learning Studio -->
+  <div class="studio" id="studioModal">
+    <div class="studio-head">
+      <div class="app-brand">Lerno Studio</div>
+      <div class="studio-actions">
+        <button class="btn-icon" id="shrinkStudioBtn" title="Minimize to Bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mode Selector -->
+    <div class="mode-segmented" id="modeSelector">
+      <div class="mode-opt active" data-mode="translate">🇮🇳 Translate</div>
+      <div class="mode-opt" data-mode="immersion">🗣️ Talk (Immersion)</div>
+      <div class="mode-opt" data-mode="tutor">🧠 Tutor & Nuance</div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="studio-nav">
+      <div class="nav-tab active" data-tab="live">Live Practice</div>
+      <div class="nav-tab" data-tab="vault">Bookmarks (<span id="bmCount">0</span>)</div>
+      <div class="nav-tab" data-tab="settings">Settings</div>
+    </div>
+
+    <!-- Studio Tab Content -->
+    <div class="tab-content">
+      <!-- Live Practice Pane -->
+      <div class="pane active" id="paneLive">
+        <div class="card-live">
+          <div class="card-label">Last Spoken Hindi / Context</div>
+          <div class="text-hindi" id="liveHindiText">Speak in Hindi or Hinglish...</div>
+          
+          <div class="card-label" style="margin-top:12px">Natural Spoken English</div>
+          <div class="text-english" id="liveEnglishText">English translation will appear here...</div>
+
+          <div class="card-actions">
+            <button class="btn-star" id="saveLiveCardBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span>Bookmark Phrase</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size:11.5px;color:var(--faint);line-height:1.5;margin-top:8px">
+          💡 <b>Tip:</b> Double-click <b>Volume UP</b> on your phone anytime (even on the lock screen) to trigger voice translation instantly.
+        </div>
+      </div>
+
+      <!-- Bookmarks Vault Pane -->
+      <div class="pane" id="paneVault">
+        <div id="bookmarksList">
+          <!-- Dynamic Bookmarks Injected Here -->
+        </div>
+      </div>
+
+      <!-- Settings Pane -->
+      <div class="pane" id="paneSettings">
+        <div class="field">
+          <div class="field-lbl">Gemini API Key</div>
+          <input type="password" id="apiKey" placeholder="AIzaSy...">
+        </div>
+
+        <div class="field">
+          <div class="field-lbl">Target Model Selection</div>
+          <select id="modelSelect">
+            <option value="models/gemini-2.5-flash-native-audio-preview-12-2025">gemini-2.5-flash-native-audio-preview (Recommended)</option>
+            <option value="models/gemini-3.1-flash-live-preview">gemini-3.1-flash-live-preview</option>
+            <option value="models/gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+            <option value="custom">-- Custom Model Name --</option>
+          </select>
+        </div>
+
+        <div class="field hidden" id="customModelBox">
+          <div class="field-lbl">Custom Model Name</div>
+          <input type="text" id="customModelInput" placeholder="models/gemini-custom-model">
+        </div>
+
+        <div class="field">
+          <div class="field-lbl">Voice Accent & Profile</div>
+          <select id="voiceSelect">
+            <option value="Aoede">Aoede (Expressive & Natural)</option>
+            <option value="Puck">Puck (Friendly)</option>
+            <option value="Charon">Charon (Deep & Clear)</option>
+            <option value="Kore">Kore (Smooth)</option>
+            <option value="Fenrir">Fenrir (Calm)</option>
+          </select>
+        </div>
+
+        <div class="item-row">
+          <div><div class="ir-title">Auto-Disconnect on Silence (4s)</div><div class="ir-desc">Saves API tokens when conversation pauses</div></div>
+          <label class="toggle"><input type="checkbox" id="autoDisconnectToggle" checked><span class="ttrack"></span><span class="tthumb"></span></label>
+        </div>
+
+        <div class="item-row">
+          <div><div class="ir-title">Acoustic Echo Guard</div><div class="ir-desc">Prevents speaker feedback loop</div></div>
+          <label class="toggle"><input type="checkbox" id="echoGuardToggle" checked><span class="ttrack"></span><span class="tthumb"></span></label>
+        </div>
+
+        <div class="item-row" style="cursor:pointer" id="openAccessibilityBtn">
+          <div><div class="ir-title">Volume UP Double-Click Setup</div><div class="ir-desc">Ensure Accessibility trigger is enabled</div></div>
+          <span style="color:var(--dim)">→</span>
+        </div>
+
+        <div class="field" style="margin-top:14px">
+          <div class="field-lbl">Custom Assistant Persona / Directives</div>
+          <textarea id="systemPrompt" rows="3" placeholder="Leave empty for default Lerno tutor..."></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PROMPT_TRANSLATE = `You are Lerno, an ultra-fast Hindi-to-English spoken translator.
+When the user speaks in Hindi or Hinglish, speak ONLY the natural, native English translation.
+Use contractions ('I'll', 'gonna', 'wanna') and native phrasing.
+Do NOT add explanations, greetings, or filler. Just speak the English translation directly.`;
+
+    const PROMPT_IMMERSION = `You are Lerno, an encouraging native English conversational partner.
+Speak only in natural English. Keep responses to 1-2 conversational sentences and ask an engaging follow-up question.
+Do not interrupt for minor mistakes. Keep the conversation flowing smoothly.`;
+
+    const PROMPT_TUTOR = `You are Lerno, an expert English language tutor specializing in helping Hindi speakers.
+When the user asks questions or speaks phrases, explain grammar, tenses, prepositions, and why certain native idioms are chosen over literal translations. Keep explanations crisp, encouraging, and spoken naturally.`;
+
+    let currentMode = "translate"; // translate | immersion | tutor
+    let ws = null;
+    let audioCtx = null;
+    let micStream = null;
+    let micProcessor = null;
+    let isMuted = false;
+    let nextAudioTime = 0;
+    let activeSources = [];
+
+    let isModelSpeaking = false;
+    let echoCooldownTimer = null;
+    let countdownInterval = null;
+    let countdownSeconds = 4;
+
+    let lastHindi = "";
+    let lastEnglish = "";
+    let bookmarks = [];
+
+    // DOM Elements
+    const dockBar = document.getElementById("dockBar");
+    const swatch = document.getElementById("swatch");
+    const subText = document.getElementById("subText");
+    const dockModeTag = document.getElementById("dockModeTag");
+    const flipBtn = document.getElementById("flipBtn");
+    const quickStarBtn = document.getElementById("quickStarBtn");
+    const expandStudioBtn = document.getElementById("expandStudioBtn");
+    const shrinkStudioBtn = document.getElementById("shrinkStudioBtn");
+    const studioModal = document.getElementById("studioModal");
+    const dockCopy = document.getElementById("dockCopy");
+
+    const liveHindiText = document.getElementById("liveHindiText");
+    const liveEnglishText = document.getElementById("liveEnglishText");
+    const saveLiveCardBtn = document.getElementById("saveLiveCardBtn");
+    const bookmarksList = document.getElementById("bookmarksList");
+    const bmCount = document.getElementById("bmCount");
+
+    const apiKeyInput = document.getElementById("apiKey");
+    const modelSelect = document.getElementById("modelSelect");
+    const customModelBox = document.getElementById("customModelBox");
+    const customModelInput = document.getElementById("customModelInput");
+    const voiceSelect = document.getElementById("voiceSelect");
+    const autoDisconnectToggle = document.getElementById("autoDisconnectToggle");
+    const echoGuardToggle = document.getElementById("echoGuardToggle");
+    const systemPromptInput = document.getElementById("systemPrompt");
+    const openAccessibilityBtn = document.getElementById("openAccessibilityBtn");
+
+    // Load Bookmarks & Settings
+    try {
+      const savedBm = localStorage.getItem("lerno_bookmarks");
+      if (savedBm) bookmarks = JSON.parse(savedBm);
+      renderBookmarks();
+
+      if (localStorage.getItem("lerno_key")) apiKeyInput.value = localStorage.getItem("lerno_key");
+      if (localStorage.getItem("lerno_voice")) voiceSelect.value = localStorage.getItem("lerno_voice");
+      if (localStorage.getItem("lerno_model")) {
+        const m = localStorage.getItem("lerno_model");
+        if (["models/gemini-2.5-flash-native-audio-preview-12-2025", "models/gemini-3.1-flash-live-preview", "models/gemini-2.0-flash-exp"].includes(m)) {
+          modelSelect.value = m;
+        } else {
+          modelSelect.value = "custom";
+          customModelInput.value = m;
+          customModelBox.classList.remove("hidden");
+        }
+      }
+      if (localStorage.getItem("lerno_auto_disconnect") !== null) {
+        autoDisconnectToggle.checked = localStorage.getItem("lerno_auto_disconnect") === "true";
+      }
+      if (localStorage.getItem("lerno_echo_guard") !== null) {
+        echoGuardToggle.checked = localStorage.getItem("lerno_echo_guard") === "true";
+      }
+      if (localStorage.getItem("lerno_prompt")) {
+        systemPromptInput.value = localStorage.getItem("lerno_prompt");
+      }
+    } catch(e) {}
+
+    // Model Selector Change
+    modelSelect.onchange = () => {
+      if (modelSelect.value === "custom") {
+        customModelBox.classList.remove("hidden");
+      } else {
+        customModelBox.classList.add("hidden");
+        localStorage.setItem("lerno_model", modelSelect.value);
+      }
+    };
+    customModelInput.oninput = () => {
+      localStorage.setItem("lerno_model", customModelInput.value.trim());
+    };
+    voiceSelect.onchange = () => localStorage.setItem("lerno_voice", voiceSelect.value);
+    autoDisconnectToggle.onchange = () => localStorage.setItem("lerno_auto_disconnect", autoDisconnectToggle.checked);
+    echoGuardToggle.onchange = () => localStorage.setItem("lerno_echo_guard", echoGuardToggle.checked);
+    systemPromptInput.oninput = () => localStorage.setItem("lerno_prompt", systemPromptInput.value.trim());
+
+    // Window Expansion & Shrink Logic
+    function openStudio() {
+      if (window.AndroidBridge && window.AndroidBridge.expandWindow) {
+        window.AndroidBridge.expandWindow();
+      }
+      studioModal.classList.add("open");
+    }
+
+    function closeStudio() {
+      studioModal.classList.remove("open");
+      if (window.AndroidBridge && window.AndroidBridge.shrinkWindow) {
+        window.AndroidBridge.shrinkWindow();
+      }
+    }
+
+    expandStudioBtn.onclick = openStudio;
+    dockCopy.onclick = openStudio;
+    shrinkStudioBtn.onclick = closeStudio;
+
+    window.handleBackButton = function() {
+      if (studioModal.classList.contains("open")) {
+        closeStudio();
+      } else {
+        if (window.AndroidBridge && window.AndroidBridge.minimize) {
+          window.AndroidBridge.minimize();
+        }
+      }
+    };
+
+    openAccessibilityBtn.onclick = () => {
+      if (window.AndroidBridge && window.AndroidBridge.openAccessibilitySettings) {
+        window.AndroidBridge.openAccessibilitySettings();
+      }
+    };
+
+    // Mode Selector Handler
+    document.querySelectorAll(".mode-opt").forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll(".mode-opt").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentMode = btn.dataset.mode;
+        dockModeTag.innerText = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
+
+        // If session active, restart with new mode prompt
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          cleanUpSession();
+          setTimeout(() => startSession(), 200);
+        }
+      };
+    });
+
+    // Studio Tab Switcher
+    document.querySelectorAll(".nav-tab").forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content .pane").forEach(p => p.classList.remove("active"));
+        tab.classList.add("active");
+        if (tab.dataset.tab === "live") document.getElementById("paneLive").classList.add("active");
+        if (tab.dataset.tab === "vault") document.getElementById("paneVault").classList.add("active");
+        if (tab.dataset.tab === "settings") document.getElementById("paneSettings").classList.add("active");
+      };
+    });
+
+    // Bookmark Vault Engine
+    function saveBookmark(hindi, english) {
+      if (!english || english === "English translation will appear here...") return;
+      const item = {
+        id: Date.now(),
+        hindi: hindi || "Phrase",
+        english: english,
+        date: new Date().toLocaleDateString()
+      };
+      bookmarks.unshift(item);
+      localStorage.setItem("lerno_bookmarks", JSON.stringify(bookmarks));
+      renderBookmarks();
+      if (window.AndroidBridge && window.AndroidBridge.showToast) {
+        window.AndroidBridge.showToast("⭐ Phrase saved to Bookmarks!");
+      }
+    }
+
+    function deleteBookmark(id) {
+      bookmarks = bookmarks.filter(b => b.id !== id);
+      localStorage.setItem("lerno_bookmarks", JSON.stringify(bookmarks));
+      renderBookmarks();
+    }
+
+    function renderBookmarks() {
+      bmCount.innerText = bookmarks.length;
+      if (bookmarks.length === 0) {
+        bookmarksList.innerHTML = `<div style="text-align:center;padding:24px;color:var(--faint);font-size:12px">No bookmarks saved yet.<br>Tap ⭐ during practice to save favorite sentences.</div>`;
+        return;
+      }
+      bookmarksList.innerHTML = bookmarks.map(b => `
+        <div class="bookmark-item">
+          <div>
+            <div class="bm-hi">${escapeHtml(b.hindi)}</div>
+            <div class="bm-en">${escapeHtml(b.english)}</div>
+          </div>
+          <button class="bm-del" onclick="deleteBookmark(${b.id})" title="Delete">✕</button>
+        </div>
+      `).join("");
+    }
+
+    quickStarBtn.onclick = () => saveBookmark(lastHindi, lastEnglish);
+    saveLiveCardBtn.onclick = () => saveBookmark(lastHindi, lastEnglish);
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+    }
+
+    function setVisualState(state, statusText) {
+      document.body.className = `state-${state}`;
+      swatch.className = `swatch state-${state}`;
+      subText.innerText = statusText;
+    }
+
+    // Silence Auto-Disconnect Countdown (4s)
+    function resetInactivityTimer() {
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
+      if (ws && ws.readyState === WebSocket.OPEN && !isModelSpeaking) {
+        subText.innerText = "Listening...";
+      }
+    }
+
+    function startInactivityCountdown() {
+      resetInactivityTimer();
+      if (!autoDisconnectToggle.checked || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+      countdownSeconds = 4;
+      subText.innerText = `Closing in ${countdownSeconds}s...`;
+
+      countdownInterval = setInterval(() => {
+        countdownSeconds--;
+        if (countdownSeconds > 0) {
+          subText.innerText = `Closing in ${countdownSeconds}s...`;
+        } else {
+          clearInterval(countdownInterval);
+          countdownInterval = null;
+          if (!isModelSpeaking && activeSources.length === 0) {
+            cleanUpSession();
+          }
+        }
+      }, 1000);
+    }
+
+    // On / Off Toggle Switch
+    flipBtn.addEventListener("click", () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        startSession();
+      } else {
+        cleanUpSession();
+      }
+    });
+
+    async function startSession() {
+      const key = apiKeyInput.value.trim();
+      if (!key) {
+        openStudio();
+        alert("Please enter your Gemini API Key in Settings.");
+        return;
+      }
+      try { localStorage.setItem("lerno_key", key); } catch(e) {}
+
+      resetInactivityTimer();
+      setVisualState("idle", "Connecting...");
+
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { channelCount: 1, sampleRate: 16000, echoCancellation: true, noiseSuppression: true }
+        });
+      } catch (err) {
+        setVisualState("idle", "Mic Blocked");
+        return;
+      }
+
+      const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioCtxClass({ sampleRate: 24000 });
+      if (audioCtx.state === "suspended") await audioCtx.resume();
+
+      let targetModel = modelSelect.value === "custom" ? customModelInput.value.trim() : modelSelect.value;
+      if (!targetModel) targetModel = "models/gemini-2.5-flash-native-audio-preview-12-2025";
+
+      const endpoint = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(key)}`;
+
+      try {
+        ws = new WebSocket(endpoint);
+      } catch (e) {
+        return;
+      }
+
+      ws.onopen = () => {
+        let basePrompt = PROMPT_TRANSLATE;
+        if (currentMode === "immersion") basePrompt = PROMPT_IMMERSION;
+        if (currentMode === "tutor") basePrompt = PROMPT_TUTOR;
+
+        const customInstructions = systemPromptInput.value.trim();
+        const fullPrompt = customInstructions ? `${basePrompt}\n\nUSER PREFERENCES:\n${customInstructions}` : basePrompt;
+
+        const setupPayload = {
+          setup: {
+            model: targetModel,
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: voiceSelect.value }
+                }
+              }
+            },
+            systemInstruction: { parts: [{ text: fullPrompt }] }
+          }
+        };
+
+        ws.send(JSON.stringify(setupPayload));
+        startMicCapture();
+
+        flipBtn.classList.add("on");
+        setVisualState("listening", "Go ahead");
+      };
+
+      ws.onmessage = async (evt) => {
+        let raw = evt.data;
+        if (raw instanceof Blob) raw = await raw.text();
+        try {
+          const res = JSON.parse(raw);
+          handleServerTurn(res);
+        } catch(e) {}
+      };
+
+      ws.onclose = () => cleanUpSession();
+    }
+
+    function startMicCapture() {
+      const micCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = micCtx.createMediaStreamSource(micStream);
+
+      micProcessor = micCtx.createScriptProcessor(2048, 1, 1);
+      micProcessor.onaudioprocess = (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (echoGuardToggle.checked && isModelSpeaking) return;
+        if (isMuted) return;
+
+        const channel = e.inputBuffer.getChannelData(0);
+
+        let sum = 0;
+        for (let i = 0; i < channel.length; i++) sum += channel[i] * channel[i];
+        const rms = Math.sqrt(sum / channel.length);
+
+        if (rms > 0.045) {
+          resetInactivityTimer();
+        }
+
+        const downsampled = downsample(channel, micCtx.sampleRate, 16000);
+        const pcm16 = toPCM16(downsampled);
+        const b64 = bufferToBase64(pcm16);
+
+        ws.send(JSON.stringify({
+          realtimeInput: {
+            audio: { data: b64, mimeType: "audio/pcm;rate=16000" }
+          }
+        }));
+      };
+
+      source.connect(micProcessor);
+      micProcessor.connect(micCtx.destination);
+    }
+
+    function handleServerTurn(msg) {
+      if (!msg.serverContent) return;
+
+      if (msg.serverContent.interrupted) {
+        stopAudioPlayback();
+        isModelSpeaking = false;
+        setVisualState("listening", "Listening...");
+        resetInactivityTimer();
+        return;
+      }
+
+      const parts = msg.serverContent.modelTurn?.parts;
+      if (parts) {
+        for (const part of parts) {
+          // If transcript or text parts exist, capture for display/bookmarks
+          if (part.text) {
+            lastEnglish = part.text;
+            liveEnglishText.innerText = lastEnglish;
+          }
+          const b64 = part.inlineData?.data || part.data;
+          if (b64) {
+            resetInactivityTimer();
+            if (echoCooldownTimer) {
+              clearTimeout(echoCooldownTimer);
+              echoCooldownTimer = null;
+            }
+            isModelSpeaking = true;
+            playPCM(b64);
+          }
+        }
+      }
+
+      if (msg.serverContent.turnComplete) scheduleTurnEnd();
+    }
+
+    function playPCM(base64Audio) {
+      setVisualState("speaking", "Speaking");
+
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      const binary = atob(base64Audio);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+
+      const pcm16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768.0;
+
+      const buffer = audioCtx.createBuffer(1, float32.length, 24000);
+      buffer.copyToChannel(float32, 0);
+
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+      if (nextAudioTime < now) nextAudioTime = now + 0.05;
+      src.start(nextAudioTime);
+      nextAudioTime += buffer.duration;
+
+      activeSources.push(src);
+      src.onended = () => {
+        const idx = activeSources.indexOf(src);
+        if (idx !== -1) activeSources.splice(idx, 1);
+        if (activeSources.length === 0) scheduleTurnEnd();
+      };
+    }
+
+    function scheduleTurnEnd() {
+      if (activeSources.length > 0) return;
+      if (echoCooldownTimer) clearTimeout(echoCooldownTimer);
+      echoCooldownTimer = setTimeout(() => {
+        isModelSpeaking = false;
+        echoCooldownTimer = null;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          setVisualState("listening", "Go ahead");
+          startInactivityCountdown();
+        }
+      }, 350);
+    }
+
+    function stopAudioPlayback() {
+      activeSources.forEach(s => { try { s.stop(); } catch(e){} });
+      activeSources = [];
+      if (audioCtx) nextAudioTime = audioCtx.currentTime;
+    }
+
+    function downsample(buf, inRate, outRate) {
+      if (inRate === outRate) return buf;
+      const ratio = inRate / outRate;
+      const len = Math.round(buf.length / ratio);
+      const out = new Float32Array(len);
+      let oR = 0, oB = 0;
+      while (oR < len) {
+        const next = Math.round((oR + 1) * ratio);
+        let sum = 0, count = 0;
+        for (let i = oB; i < next && i < buf.length; i++) { sum += buf[i]; count++; }
+        out[oR] = count > 0 ? sum / count : 0;
+        oR++;
+        oB = next;
+      }
+      return out;
+    }
+
+    function toPCM16(input) {
+      const out = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      return out.buffer;
+    }
+
+    function bufferToBase64(buffer) {
+      let bin = "";
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < bytes.byteLength; i += 1024) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 1024, bytes.byteLength)));
+      }
+      return window.btoa(bin);
+    }
+
+    // Zero-Leak Hard Kill Teardown
+    function cleanUpSession() {
+      resetInactivityTimer();
+      stopAudioPlayback();
+      if (echoCooldownTimer) clearTimeout(echoCooldownTimer);
+      isModelSpeaking = false;
+
+      if (ws) {
+        try { ws.close(1000, "Session ended"); } catch(e) {}
+        ws = null;
+      }
+
+      if (micStream) {
+        try {
+          micStream.getTracks().forEach(t => { t.stop(); t.enabled = false; });
+        } catch(e) {}
+        micStream = null;
+      }
+
+      if (micProcessor) {
+        try { micProcessor.disconnect(); } catch(e) {}
+        micProcessor = null;
+      }
+
+      if (audioCtx) {
+        try { if (audioCtx.state !== 'closed') audioCtx.close(); } catch(e) {}
+        audioCtx = null;
+      }
+
+      flipBtn.classList.remove("on");
+      setVisualState("idle", "Idle");
+    }
+
+    window.autoConnectOnWake = function() {
+      if (apiKeyInput.value.trim() && (!ws || ws.readyState !== WebSocket.OPEN)) {
+        startSession();
+      }
+    };
+  </script>
+</body>
+</html>
